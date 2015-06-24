@@ -1,5 +1,5 @@
 /* jshint loopfunc: true */
-/* global SettingsHelper, SettingsListener, applications,
+/* global Service, SettingsListener, applications,
           UtilityTray, MozActivity */
 
 'use strict';
@@ -72,21 +72,8 @@
       this.getAllElements();
       this.monitorDataChange();
 
-      (function initNetworkSprite() {
-        var networkTypeSetting =
-          SettingsHelper('operatorResources.data.icon', {});
-
-        networkTypeSetting.get(function gotNS(networkTypeValues) {
-          if (!networkTypeValues) {
-            return;
-          }
-          var sprite = networkTypeValues.data_sprite;
-          if (sprite) {
-            document.getElementById('quick-settings-data')
-              .style.backgroundImage = 'url("' + sprite + '")';
-          }
-        });
-      })();
+      window.addEventListener('dataiconchanged', this);
+      this._handle_dataiconchanged();
 
       this.overlay.addEventListener('click', this);
       window.addEventListener('utilitytrayshow', this);
@@ -95,6 +82,18 @@
       this.monitorWifiChange();
       this.monitorGeoChange();
       this.monitorAirplaneModeChange();
+    },
+
+    _handle_dataiconchanged: function() {
+      var networkTypeValues = Service.query('dataIcon');
+      if (!networkTypeValues) {
+        return;
+      }
+      var sprite = networkTypeValues.data_sprite;
+      if (sprite) {
+        document.getElementById('quick-settings-data')
+                .style.backgroundImage = 'url("' + sprite + '")';
+      }
     },
 
     /**
@@ -195,8 +194,9 @@
       var wifiFirstSet = true;
       SettingsListener.observe('wifi.enabled', true, function(value) {
         // check self.wifi.dataset.enabled and value are identical
-        if ((self.wifi.dataset.enabled && value) ||
-          (self.wifi.dataset.enabled === undefined && !value)) {
+        if ((self.wifi.dataset.enabled === 'true' && value) ||
+          ((self.wifi.dataset.enabled === undefined ||
+            self.wifi.dataset.enabled === 'false') && !value)) {
           return;
         }
 
@@ -275,6 +275,9 @@
       evt.preventDefault();
       var enabled = false;
       switch (evt.type) {
+        case 'dataiconchanged':
+          this._handle_dataiconchanged();
+          break;
         case 'click':
           switch (evt.target) {
             case this.wifi:
@@ -415,7 +418,7 @@
 
       this.overlay = document.getElementById('quick-settings');
     },
-    
+
     /**
      * XXX Break down obj keys in a for each loop because mozSettings
      * does not currently supports multiple keys in one set()
@@ -439,14 +442,12 @@
      * @memberof QuickSettings.prototype
      */
     setAccessibilityAttributes: function(button, label, type) {
-      label += button.dataset.enabled === undefined ? '-off' : '-on';
+      label = 'quick-settings-' + label +
+        (button.dataset.enabled === undefined ? '-off' : '-on');
       if (button.dataset.initializing !== undefined) {
         label += '-initializing';
       }
-
-      button.setAttribute('aria-label', navigator.mozL10n.get(label, {
-        type: type || ''
-      }));
+      navigator.mozL10n.setAttributes(button, label, { type: type || '' });
       button.setAttribute('aria-pressed', button.dataset.enabled !== undefined);
     },
 

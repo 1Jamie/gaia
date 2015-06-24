@@ -9,7 +9,8 @@ marionette('Status Bar icons - Alarm', function() {
       settings: {
         'alarm.enabled': true
       }
-    }
+    },
+    desiredCapabilities: { raisesAccessibilityExceptions: true }
   });
 
   var system;
@@ -17,8 +18,8 @@ marionette('Status Bar icons - Alarm', function() {
 
   setup(function() {
     system = client.loader.getAppClass('system');
+    system.waitForFullyLoaded();
     statusBar = new StatusBar(client);
-    system.waitForStartup();
   });
 
   test('should disappear when the alarm.enabled setting changes', function() {

@@ -12,7 +12,8 @@ marionette('Software Home Button - Permission Prompt', function() {
       settings: {
         'software-button.enabled': true
       }
-    }
+    },
+    desiredCapabilities: { raisesAccessibilityExceptions: true }
   });
   var home, rocketbar, system;
 
@@ -20,7 +21,7 @@ marionette('Software Home Button - Permission Prompt', function() {
     home = client.loader.getAppClass('verticalhome');
     rocketbar = new Rocketbar(client);
     system = client.loader.getAppClass('system');
-    system.waitForStartup();
+    system.waitForFullyLoaded();
     home.waitForLaunch();
     client.switchToFrame();
   });

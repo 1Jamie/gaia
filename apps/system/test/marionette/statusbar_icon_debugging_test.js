@@ -9,7 +9,8 @@ marionette('Status Bar icons - Debugging', function() {
       settings: {
         'debugger.remote-mode': 'disabled'
       }
-    }
+    },
+    desiredCapabilities: { raisesAccessibilityExceptions: true }
   });
 
   var system;
@@ -17,8 +18,8 @@ marionette('Status Bar icons - Debugging', function() {
 
   setup(function() {
     system = client.loader.getAppClass('system');
+    system.waitForFullyLoaded();
     statusBar = new StatusBar(client);
-    system.waitForStartup();
   });
 
   test('should appear when debugging is enabled', function() {

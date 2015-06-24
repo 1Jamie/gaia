@@ -12,7 +12,10 @@ marionette('Edges gesture >', function() {
   var client = marionette.client({
     profile: {
       prefs: {
-        'devtools.debugger.forbid-certified-apps': false
+        'browser.safebrowsing.enabled': false,
+        'browser.safebrowsing.malware.enabled': false,
+        'devtools.debugger.forbid-certified-apps': false,
+        'privacy.trackingprotection.enabled': false
       },
       settings: {
         'devtools.overlay': true,
@@ -29,7 +32,7 @@ marionette('Edges gesture >', function() {
     actions = client.loader.getActions();
 
     sys = client.loader.getAppClass('system');
-    sys.waitForStartup();
+    sys.waitForFullyLoaded();
 
     settings = sys.waitForLaunch(SETTINGS_APP);
     calendar = sys.waitForLaunch(CALENDAR_APP);

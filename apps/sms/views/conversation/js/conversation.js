@@ -5,9 +5,11 @@
          SMIL, ErrorDialog, MessageManager, LinkHelper,
          ActivityPicker, InboxView, OptionMenu, Threads, Contacts,
          Attachment, WaitingScreen, MozActivity, LinkActionHandler,
-         ActivityHandler, TimeHeaders, ContactRenderer, Draft, Drafts,
+         TimeHeaders, ContactRenderer, Draft, Drafts,
          MultiSimActionButton, Navigation, Promise, LazyLoader,
+         App,
          SharedComponents,
+         ActivityClient,
          Errors,
          EventDispatcher,
          SelectionHandler,
@@ -302,7 +304,7 @@ var ConversationView = {
    * @private
    */
   backOrClose: function conv_backOrClose() {
-    var inActivity = ActivityHandler.isInActivity();
+    var inActivity = ActivityClient.hasPendingRequest();
     var isComposer = Navigation.isCurrentPanel('composer');
     var isThread = Navigation.isCurrentPanel('thread');
     var action = inActivity && (isComposer || isThread) ? 'close' : 'back';
@@ -477,9 +479,8 @@ var ConversationView = {
    */
   beforeEnter: function conv_beforeEnter(args) {
     this.clearConvertNoticeBanners();
-    this.setHeaderAction(ActivityHandler.isInActivity() ? 'close' : 'back');
+    this.setHeaderAction(ActivityClient.hasPendingRequest() ? 'close' : 'back');
 
-    Recipients.View.isFocusable = true;
     if (!this.multiSimActionButton) {
       // handles the various actions on the send button and encapsulates the
       // DSDS specific behavior
@@ -513,16 +514,16 @@ var ConversationView = {
     // get an event whenever the panel changes?
     Threads.currentId = args.id;
 
-    var prevPanel = args.meta.prev && args.meta.prev.panel;
+    var prevPanel = args.meta.prev;
 
     // If transitioning from composer, we don't need to notify about type
     // conversion but only after the type of the thread is set
     // (afterEnterThread)
-    if (prevPanel !== 'composer') {
+    if (!prevPanel || prevPanel.panel !== 'composer') {
       this.enableConvertNoticeBanners();
     }
 
-    if (prevPanel !== 'group-view' && prevPanel !== 'report-view') {
+    if (!this.isConversationPanel(args.id, prevPanel)) {
       this.initializeRendering();
     }
 
@@ -562,6 +563,8 @@ var ConversationView = {
       this.recipients.focus();
     }
 
+    this.emit('visually-loaded');
+
     // not strictly necessary but better for consistency
     return Promise.resolve();
   },
@@ -569,9 +572,9 @@ var ConversationView = {
   afterEnterThread: function conv_afterEnterThread(args) {
     var threadId = +args.id;
 
-    var prevPanel = args.meta.prev && args.meta.prev.panel;
+    var prevPanel = args.meta.prev;
 
-    if (prevPanel !== 'group-view' && prevPanel !== 'report-view') {
+    if (!this.isConversationPanel(threadId, prevPanel)) {
       this.renderMessages(threadId);
 
       // Populate draft if there is one
@@ -587,9 +590,9 @@ var ConversationView = {
       });
     }
 
-    // Let's mark thread only when thread list is fully rendered and target node
+    // Let's mark thread only when inbox is fully rendered and target node
     // is in the DOM tree.
-    InboxView.whenReady().then(function() {
+    App.whenReady().then(function() {
       // We use setTimeout (macrotask) here to allow reflow happen as soon as
       // possible and to not interrupt it with non-critical task since Promise
       // callback only (microtask) won't help here.
@@ -599,7 +602,7 @@ var ConversationView = {
     });
 
     // Enable notifications redirected from composer only after the user enters.
-    if (prevPanel === 'composer') {
+    if (prevPanel && prevPanel.panel === 'composer') {
       this.enableConvertNoticeBanners();
     }
 
@@ -613,7 +616,7 @@ var ConversationView = {
   beforeLeave: function conv_beforeLeave(args) {
     this.disableConvertNoticeBanners();
 
-    var nextPanel = args.meta.next && args.meta.next.panel;
+    var nextPanel = args.meta.next;
 
     // This should be in afterLeave, but the edit mode interface does not seem
     // to slide correctly. Bug 1009541
@@ -630,7 +633,7 @@ var ConversationView = {
     }
 
     // TODO move most of back() here: Bug 1010223
-    if (nextPanel !== 'group-view' && nextPanel !== 'report-view') {
+    if (!this.isConversationPanel(Threads.currentId, nextPanel)) {
       this.cleanFields();
     }
   },
@@ -737,6 +740,8 @@ var ConversationView = {
   },
 
   beforeEnterComposer: function conv_beforeEnterComposer(args) {
+    Recipients.View.isFocusable = true;
+
     this.enableConvertNoticeBanners();
 
     // TODO add the activity/forward/draft stuff here
@@ -814,21 +819,45 @@ var ConversationView = {
     TimeHeaders.updateAll('header[data-time-update]');
   },
 
-  isCurrentThread: function conv_isCurrentThread(threadId) {
-    return Navigation.isCurrentPanel('thread', { id: threadId }) ||
+  /**
+   * Checks if specified conversation id is currently active. It can be true for
+   * either conversation, participants or report panels.
+   * @param {number} conversationId Id of the conversation.
+   * @returns {boolean}
+   */
+  isCurrentConversation: function conv_isCurrentConversation(conversationId) {
+    return Navigation.isCurrentPanel('thread', { id: conversationId }) ||
       Navigation.isCurrentPanel('report-view', {
-        threadId: threadId
+        threadId: conversationId
       }) ||
       Navigation.isCurrentPanel('group-view', {
-        id: threadId
+        id: conversationId
       });
+  },
+
+  /**
+   * Checks if specified panel corresponds to the specified conversation id. It
+   * can be true for either conversation, participants or report panels.
+   * @param {number} conversationId Id of the conversation.
+   * @param {Object} panel Panel description object to compare against.
+   * @returns {boolean}
+   */
+  isConversationPanel:
+  function conv_isConversationPanel(conversationId, panel) {
+    if (!panel) {
+      return false;
+    }
+
+    return panel.panel === 'thread' && panel.args.id === conversationId ||
+      panel.panel === 'report-view' && panel.args.threadId === conversationId ||
+      panel.panel === 'group-view' && panel.args.id === conversationId;
   },
 
   onMessageReceived: function conv_onMessageReceived(e) {
     var message = e.message;
 
     // If user currently in other thread then there is nothing to do here
-    if (!this.isCurrentThread(message.threadId)) {
+    if (!this.isCurrentConversation(message.threadId)) {
       return;
     }
 
@@ -843,7 +872,7 @@ var ConversationView = {
 
   onMessageSending: function conv_onMessageReceived(e) {
     var message = e.message;
-    if (this.isCurrentThread(message.threadId)) {
+    if (this.isCurrentConversation(message.threadId)) {
       this.onMessage(message);
       this.forceScrollViewToBottom();
     } else {
@@ -1060,7 +1089,7 @@ var ConversationView = {
   close: function conv_close() {
     return this._onNavigatingBack().then(() => {
       this.cleanFields();
-      ActivityHandler.leaveActivity();
+      return ActivityClient.postResult();
     }).catch(function(e) {
       // If we don't have any error that means that action was rejected
       // intentionally and there is nothing critical to report about.
@@ -1437,6 +1466,8 @@ var ConversationView = {
     TimeHeaders.updateAll('header[data-time-update]');
     // Go to Bottom
     this.scrollViewToBottom();
+
+    this.emit('visually-loaded');
   },
 
   createMmsContent: function conv_createMmsContent(dataArray) {
@@ -1824,7 +1855,7 @@ var ConversationView = {
     }
 
     if (!this.selectionHandler) {
-      LazyLoader.load('views/shared/js/selection_handler.js', () => {
+      LazyLoader.load('/views/shared/js/selection_handler.js', () => {
         this.selectionHandler = new SelectionHandler({
           // Elements
           container: this.container,
@@ -2240,7 +2271,7 @@ var ConversationView = {
       if (recipients.length > 1) {
         this.shouldChangePanelNextEvent = false;
         Navigation.toPanel('thread-list');
-        if (ActivityHandler.isInActivity()) {
+        if (ActivityClient.hasPendingRequest()) {
           setTimeout(this.close.bind(this), this.LEAVE_ACTIVITY_DELAY);
         }
 
@@ -2855,7 +2886,7 @@ var ConversationView = {
       );
     }
 
-    if (opt.contactId && !ActivityHandler.isInActivity()) {
+    if (opt.contactId && !ActivityClient.hasPendingRequest()) {
         params.items.push({
           l10nId: 'viewContact',
           method: () => ActivityPicker.viewContact({ id: opt.contactId })
@@ -2990,7 +3021,7 @@ Object.defineProperty(exports, 'ConversationView', {
   get: function () {
     delete exports.ConversationView;
 
-    var allowedEvents = ['recipientschange'];
+    var allowedEvents = ['recipientschange', 'visually-loaded'];
     return (exports.ConversationView =
       EventDispatcher.mixin(ConversationView, allowedEvents));
   },

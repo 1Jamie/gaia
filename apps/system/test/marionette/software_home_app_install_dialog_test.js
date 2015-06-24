@@ -14,7 +14,8 @@ marionette('Software Home Button - App Install Dialog', function() {
       settings: {
         'software-button.enabled': true
       }
-    }
+    },
+    desiredCapabilities: { raisesAccessibilityExceptions: true }
   });
   var appInstall, home, server, serverManifestURL, serverRootURL, system;
 
@@ -38,7 +39,7 @@ marionette('Software Home Button - App Install Dialog', function() {
     appInstall = new AppInstall(client);
     home = client.loader.getAppClass('verticalhome');
     system = client.loader.getAppClass('system');
-    system.waitForStartup();
+    system.waitForFullyLoaded();
     home.waitForLaunch();
     client.switchToFrame();
   });

@@ -430,6 +430,21 @@
     "dictFilePath": "dictionaries/fr.dict"
   },
   {
+    "id": "fy",
+    "name": "Frysk",
+    "imEngineId": "latin",
+    "types": [
+      "email",
+      "password",
+      "text",
+      "url"
+    ],
+    "dictFileSize": 2813460,
+    "preloaded": false,
+    "dictFilename": "fy.dict",
+    "dictFilePath": "dictionaries/fy.dict"
+  },
+  {
     "id": "ga",
     "name": "Gaeilge",
     "imEngineId": "latin",
@@ -883,6 +898,18 @@
     "dictFilePath": "dictionaries/tr.dict"
   },
   {
+    "id": "uk",
+    "name": "Українська",
+    "imEngineId": "latin",
+    "types": [
+      "email",
+      "text",
+      "url"
+    ],
+    "dictFileSize": 2518,
+    "preloaded": true
+  },
+  {
     "id": "vi-Qwerty",
     "name": "Tiếng Việt (QWERTY)",
     "imEngineId": "vietnamese",
@@ -891,7 +918,7 @@
       "text",
       "url"
     ],
-    "dictFileSize": 13595,
+    "dictFileSize": 13908,
     "preloaded": true
   },
   {
@@ -915,7 +942,7 @@
       "text",
       "url"
     ],
-    "dictFileSize": 13595,
+    "dictFileSize": 13908,
     "preloaded": true
   },
   {

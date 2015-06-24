@@ -6,7 +6,9 @@ var APP = 'app://sms.gaiamobile.org';
 
 marionette('Status Bar icons - Recording', function() {
 
-  var client = marionette.client();
+  var client = marionette.client({
+    desiredCapabilities: { raisesAccessibilityExceptions: true }
+  });
 
   var system;
   var statusBar;
@@ -19,9 +21,8 @@ marionette('Status Bar icons - Recording', function() {
 
   setup(function() {
     system = client.loader.getAppClass('system');
+    system.waitForFullyLoaded();
     statusBar = new StatusBar(client);
-    system.waitForStartup();
-    // statusBar.changeDelayValue('RecordingIcon');
     statusBar.dispatchMozChromeEvent('recording-status', {active: true,
       requestURL: 'app://fake.recorder.org'});
   });

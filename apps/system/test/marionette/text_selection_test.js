@@ -6,13 +6,13 @@ marionette('Text selection >', function() {
   var assert = require('assert');
   var apps = {};
   var action;
+  var system;
 
   apps[FakeTextSelectionApp.ORIGIN] =
     __dirname + '/../apps/faketextselectionapp';
 
   suite('without lockscreen', function() {
     var fakeTextselectionApp;
-    var system;
     var client = marionette.client({
       profile: {
         apps: apps,
@@ -25,7 +25,7 @@ marionette('Text selection >', function() {
 
     setup(function() {
       system = client.loader.getAppClass('system');
-      system.waitForStartup();
+      system.waitForFullyLoaded();
       fakeTextselectionApp = new FakeTextSelectionApp(client);
       action = new Actions(client);
     });
@@ -35,9 +35,9 @@ marionette('Text selection >', function() {
         fakeTextselectionApp.setTestFrame('functionality');
       });
 
-      // XXX: bug 1168326 .
-      test.skip('short cut test', function(done) {
+      test('short cut test', function(done) {
         fakeTextselectionApp.longPress('FunctionalitySourceInput');
+
         // store caret position
         var caretPositionOfSourceInput =
           fakeTextselectionApp.FunctionalitySourceInput
@@ -290,8 +290,7 @@ marionette('Text selection >', function() {
         });
     });
 
-    // XXX: bug 1168326 .
-    suite.skip('selection carets bug', function() {
+    suite('selection carets bug', function() {
       setup(function() {
         fakeTextselectionApp.setTestFrame('bug1120358');
       });
@@ -359,8 +358,9 @@ marionette('Text selection >', function() {
           fakeTextselectionApp.selectAll('BugTextarea');
           assert.ok(fakeTextselectionApp.bubbleVisiblity,
             'bubble should show since we press selectall');
-        });
+      });
     });
+  });
 
   suite('with lockscreen enabled', function() {
     var fakeTextselectionAppWithLockscreen;
@@ -378,6 +378,8 @@ marionette('Text selection >', function() {
     });
 
     setup(function() {
+      system = clientWithLockscreen.loader.getAppClass('system');
+      system.waitForFullyLoaded();
       fakeTextselectionAppWithLockscreen =
         new FakeTextSelectionApp(clientWithLockscreen);
       fakeTextselectionAppWithLockscreen.setTestFrame('bug');
@@ -396,19 +398,21 @@ marionette('Text selection >', function() {
         fakeTextselectionAppWithLockscreen.longPress('BugCenterInput');
 
         // turn off screen
+        // XXX: Use system.turnScreenOn();
         clientWithLockscreen.switchToFrame();
         clientWithLockscreen.executeScript(function() {
-          window.wrappedJSObject.ScreenManager.turnScreenOff(true, 'powerkey');
+          window.wrappedJSObject.Service.request(
+            'turnScreenOff', true, 'powerkey');
         });
         clientWithLockscreen.helper.wait(500);
         // turn on screen
+        // XXX: Use system.turnScreenOff();
         clientWithLockscreen.executeScript(function() {
-          window.wrappedJSObject.ScreenManager.turnScreenOn();
+          window.wrappedJSObject.Service.request('turnScreenOn');
         });
         clientWithLockscreen.waitFor(function() {
           return !fakeTextselectionAppWithLockscreen.bubbleVisiblity;
         });
-      });
     });
   });
 });

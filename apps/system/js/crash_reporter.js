@@ -1,4 +1,4 @@
-/* global SettingsListener, SystemBanner */
+/* global SettingsListener, SystemBanner, LazyLoader */
 /* exported CrashReporter */
 'use strict';
 
@@ -27,7 +27,7 @@ var CrashReporter = (function() {
   function showDialog(crashID, isChrome) {
     var elem = document.getElementById('crash-dialog-title');
     if (isChrome) {
-      navigator.mozL10n.setAttributes(elem, 'crash-dialog-os2');
+      navigator.mozL10n.setAttributes(elem, 'crash-dialog2-os');
     } else {
       navigator.mozL10n.setAttributes(
         elem,
@@ -99,9 +99,12 @@ var CrashReporter = (function() {
         }
       };
     }
-
-    var systemBanner = new SystemBanner();
-    systemBanner.show(message, button);
+    LazyLoader.load(['js/system_banner.js']).then(() => {
+      var systemBanner = new SystemBanner();
+      systemBanner.show(message, button);
+    }).catch((err) => {
+      console.error(err);
+    });
   }
 
   function deleteCrash(crashID) {

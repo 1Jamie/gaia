@@ -14,7 +14,8 @@ marionette('Software Home Button - Notification Banner Test', function() {
       settings: {
         'software-button.enabled': true
       }
-    }
+    },
+    desiredCapabilities: { raisesAccessibilityExceptions: true }
   });
   var appInstall, home, server, system;
 
@@ -35,7 +36,7 @@ marionette('Software Home Button - Notification Banner Test', function() {
     appInstall = new AppInstall(client);
     home = client.loader.getAppClass('verticalhome');
     system = client.loader.getAppClass('system');
-    system.waitForStartup();
+    system.waitForFullyLoaded();
     home.waitForLaunch();
     client.switchToFrame();
   });

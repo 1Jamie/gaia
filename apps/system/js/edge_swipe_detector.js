@@ -1,10 +1,7 @@
 'use strict';
-/* global FtuLauncher */
-/* global layoutManager */
 /* global SettingsListener */
 /* global Service */
 /* global SheetsTransition */
-/* global softwareButtonManager */
 /* global StackManager */
 /* global TouchForwarder */
 
@@ -44,10 +41,10 @@
       window.addEventListener('updateprompthidden', this);
       window.addEventListener('installpromptshown', this);
       window.addEventListener('installprompthidden', this);
-      window.addEventListener('rocketbar-activating', this);
-      window.addEventListener('rocketbar-deactivated', this);
       window.addEventListener('shrinking-start', this);
       window.addEventListener('shrinking-stop', this);
+      window.addEventListener('hierarchychanged', this);
+      window.addEventListener('hierarchytopmostwindowchanged', this);
 
       ['touchstart', 'touchmove', 'touchend',
        'mousedown', 'mousemove', 'mouseup'].forEach(function(e) {
@@ -102,6 +99,24 @@
      */
     handleEvent: function esd_handleEvent(e) {
       switch (e.type) {
+        case 'hierarchychanged':
+        case 'hierarchytopmostwindowchanged':
+          // XXX: Use this.appWindowManager instead if
+          // we become part of appWindowManager submodules.
+          // i.e., Service.query('getTopMostUI') === this.parent
+          if (Service.query('getTopMostUI') &&
+              Service.query('getTopMostUI').name === 'AppWindowManager') {
+            if (Service.query('getTopMostWindow') &&
+                !Service.query('getTopMostWindow').isHomescreen &&
+                !Service.query('isFtuRunning')) {
+              this.lifecycleEnabled = true;
+            } else {
+              this.lifecycleEnabled = false;
+            }
+          } else {
+            this.lifecycleEnabled = false;
+          }
+          break;
         case 'mousedown':
         case 'mousemove':
         case 'mouseup':
@@ -124,11 +139,10 @@
         case 'appopened':
           var app = e.detail;
           if (!app.stayBackground) {
-            this.lifecycleEnabled = (app.origin !== FtuLauncher.getFtuOrigin());
+            this.lifecycleEnabled =
+              (app.origin !== Service.query('getFtuOrigin'));
           }
           break;
-        case 'homescreenopened':
-        case 'rocketbar-activating':
         case 'shrinking-start':
           this.lifecycleEnabled = false;
           break;
@@ -155,11 +169,13 @@
         case 'installpromptshown':
           this.lifecycleEnabled = false;
           break;
+        // XXX: Move install/update dialog into system dialog
+        // and then we could remove this.
         case 'updateprompthidden':
         case 'installprompthidden':
-        case 'rocketbar-deactivated':
         case 'shrinking-stop':
-          if (Service.currentApp && !Service.currentApp.isHomescreen) {
+          if (Service.query('getTopMostWindow') &&
+              !Service.query('getTopMostWindow').isHomescreen) {
             this.lifecycleEnabled = true;
           }
           break;
@@ -287,7 +303,8 @@
 
       if (this._forwarding) {
         this._forward(e);
-      } else if ((this._deltaX < 5) && (this._deltaY < 5)) {
+      } else if ((this._deltaX < kSignificant) &&
+                 (this._deltaY < kSignificant)) {
         setTimeout(function(self, touchstart, touchend) {
           self._forward(touchstart);
           setTimeout(function() {
@@ -402,14 +419,16 @@
       // but we still want to redispatch touch events to the "overlayed"
       // software home button
       var softwareButtonOverlayed =
-        Service.currentApp &&
-        Service.currentApp.isFullScreenLayout();
+        Service.query('getTopMostWindow') &&
+        Service.query('getTopMostWindow').isFullScreenLayout();
+      var width = Service.query('LayoutManager.width');
+      var height = Service.query('LayoutManager.height');
       if (softwareButtonOverlayed) {
-        return x > (layoutManager.width - softwareButtonManager.width) ||
-            y > (layoutManager.height - softwareButtonManager.height);
+        var sbWidth = Service.query('SoftwareButtonManager.width');
+        var sbHeight = Service.query('SoftwareButtonManager.height');
+        return x > (width - sbWidth) || y > (height - sbHeight);
       }
-      return (x > layoutManager.width ||
-              y > layoutManager.height);
+      return (x > width || y > height);
     },
 
     /**

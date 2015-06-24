@@ -4,15 +4,16 @@ var StatusBar = require('./lib/statusbar');
 
 marionette('Status Bar icons - Network Activity', function() {
 
-  var client = marionette.client();
+  var client = marionette.client({
+    desiredCapabilities: { raisesAccessibilityExceptions: true }
+  });
 
   var system, statusBar, networkActivity;
 
   setup(function() {
     system = client.loader.getAppClass('system');
+    system.waitForFullyLoaded();
     statusBar = new StatusBar(client);
-    system.waitForStartup();
-    statusBar.init();
     networkActivity = statusBar['network-activity'];
     networkActivity.hide();
   });

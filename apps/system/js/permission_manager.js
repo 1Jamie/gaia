@@ -1,4 +1,4 @@
-/* global Service, applications, ManifestHelper, Tagged */
+/* global Service, applications, ManifestHelper, Sanitizer */
 'use strict';
 (function(exports) {
   /**
@@ -105,7 +105,7 @@
      * @memberof PermissionManager.prototype
      */
     deviceOptionView: function({id, checked, label}) {
-      return Tagged.escapeHTML `<label class="device-list deviceEnable">
+      return Sanitizer.escapeHTML `<label class="device-list deviceEnable">
           <input class="input-enable" id="${id}" type="checkbox" ${checked}>
           <span></span>
         </label>
@@ -275,7 +275,7 @@
           }
           break;
         case 'screenchange':
-          if (Service.locked && !detail.screenEnabled) {
+          if (Service.query('locked') && !detail.screenEnabled) {
             this.discardPermissionRequest();
           }
           break;
@@ -322,7 +322,8 @@
         this.cancelRequest(this.currentRequestId);
         this.isFullscreenRequest = false;
       }
-      if (detail.fullscreenorigin !== Service.currentApp.origin) {
+      if (detail.fullscreenorigin !==
+          Service.query('getTopMostWindow').origin) {
         this.isFullscreenRequest = true;
         detail.id = 'fullscreen';
         this.showPermissionPrompt(

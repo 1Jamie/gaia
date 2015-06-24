@@ -40,6 +40,11 @@
     this.render();
 
     if (this.app.themeColor) {
+      // If titlestatechanged is fired during creation, appChrome won't have
+      // been set yet.
+      app.appChrome = this;
+
+      this._themeChanged = true;
       this.setThemeColor(this.app.themeColor);
     }
 
@@ -75,9 +80,12 @@
 
     if (this.isSearchApp()) {
       this.app.element.classList.add('search-app');
-      this.title.setAttribute('data-l10n-id', 'search-or-enter-address');
     } else {
       this.app.element.classList.remove('search-app');
+    }
+
+    if (this.app.isHomescreen || this.isSearchApp()) {
+      this.title.setAttribute('data-l10n-id', 'search-or-enter-address');
     }
 
     if (chrome.bar) {
@@ -90,7 +98,7 @@
 
       if (this.app.isPrivateBrowser()) {
         this.element.classList.add('private');
-      } else {
+      } else if (!this.app.themeColor) {
         this.app.element.classList.add('light');
       }
 
@@ -100,7 +108,7 @@
     if (chrome.maximized) {
       this.element.classList.add('maximized');
 
-      if (!this.app.isBrowser()) {
+      if (!this.app.isBrowser() && !this.app.isHomescreen) {
         this.app.element.classList.add('scrollable');
       }
     }
@@ -325,7 +333,7 @@
 
   AppChrome.prototype.titleClicked = function ac_titleClicked() {
     var contextMenu = this.app.contextmenu && this.app.contextmenu.isShown();
-    var locked = Service && Service.locked;
+    var locked = Service && Service.query('locked');
 
     if (locked || contextMenu) {
       return;
@@ -365,9 +373,11 @@
 
   AppChrome.prototype._registerEvents = function ac__registerEvents() {
     if (this.useCombinedChrome()) {
-      LazyLoader.load('shared/js/bookmarks_database.js', function() {
+      LazyLoader.load('shared/js/bookmarks_database.js').then(() => {
         this.updateAddToHomeButton();
-      }.bind(this));
+      }).catch((err) => {
+        console.error(err);
+      });
       LazyLoader.load('shared/elements/gaia_overflow_menu/script.js');
 
       this.stopButton.addEventListener('click', this);
@@ -549,7 +559,13 @@
       this.scrollable.style.backgroundColor = color;
     }
 
-    if (color === 'transparent' || color === '') {
+    if (color === '') {
+      this.app.element.classList.add('light');
+      this.app.publish('titlestatechanged');
+      return;
+    }
+
+    if (color === 'transparent') {
       this.app.element.classList.remove('light');
       this.app.publish('titlestatechanged');
       return;
@@ -785,7 +801,7 @@
     }
     var url = this._currentURL;
 
-    LazyLoader.load('shared/js/icons_helper.js', (function() {
+    LazyLoader.load('shared/js/icons_helper.js').then(() => {
       IconsHelper.getIcon(url, null, {icons: favicons}).then(icon => {
         var activity = new MozActivity({
           name: 'save-bookmark',
@@ -804,7 +820,9 @@
           }.bind(this);
         }
       });
-    }).bind(this));
+    }).catch((err) => {
+      console.error(err);
+    });
   };
 
   AppChrome.prototype.onAddBookmark = function ac_onAddBookmark() {

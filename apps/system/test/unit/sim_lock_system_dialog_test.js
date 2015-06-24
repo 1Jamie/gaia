@@ -1,5 +1,6 @@
 /* globals MockL10n, MocksHelper, MockSIMSlot, MockSIMSlotManager,
-           SimLockSystemDialog, MockApplications, SystemDialog */
+           SimLockSystemDialog, MockApplications, SystemDialog,
+           Service */
 
 'use strict';
 
@@ -21,7 +22,7 @@ var mocksForSimLockSystemDialog = new MocksHelper([
 suite('sim lock dialog', function() {
   var realL10n = window.navigator.mozL10n;
   var stubByQuery, stubById;
-  var subject;
+  var subject, stubLockOrientation;
 
   mocksForSimLockSystemDialog.attachTestHelpers();
   suiteSetup(function() {
@@ -43,6 +44,15 @@ suite('sim lock dialog', function() {
     SimLockSystemDialog.prototype.containerElement =
       document.createElement('div');
     subject = new SimLockSystemDialog();
+    stubLockOrientation = this.sinon.stub();
+
+    this.sinon.stub(Service, 'query', function(name) {
+      if (name === 'getTopMostWindow') {
+        return {
+          lockOrientation: stubLockOrientation
+        };
+      }
+    });
   });
 
   teardown(function() {
@@ -199,7 +209,28 @@ suite('sim lock dialog', function() {
       assert.isTrue(stubClear.called);
     });
 
+    test('locks the orientation', function() {
+      assert.isTrue(stubLockOrientation.calledWith('portrait-primary'));
+    });
+
     test('calls to SystemDialog show method', function() {
+      assert.isTrue(stubApply.calledWith(subject));
+    });
+  });
+
+  suite('hide', function() {
+    var stubApply;
+
+    setup(function() {
+      stubApply = this.sinon.stub(SystemDialog.prototype.hide, 'apply');
+      subject.hide();
+    });
+
+    test('unlocks the orientation', function() {
+      assert.isTrue(stubLockOrientation.calledWith());
+    });
+
+    test('calls to SystemDialog hide method', function() {
       assert.isTrue(stubApply.calledWith(subject));
     });
   });

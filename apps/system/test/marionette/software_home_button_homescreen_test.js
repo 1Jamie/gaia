@@ -9,7 +9,8 @@ marionette('Software Home Button - Modal Dialog', function() {
       settings: {
         'software-button.enabled': true
       }
-    }
+    },
+    desiredCapabilities: { raisesAccessibilityExceptions: true }
   });
   var home, system, actions;
 
@@ -17,7 +18,7 @@ marionette('Software Home Button - Modal Dialog', function() {
     home = client.loader.getAppClass('verticalhome');
     system = client.loader.getAppClass('system');
     actions = client.loader.getActions();
-    system.waitForStartup();
+    system.waitForFullyLoaded();
     home.waitForLaunch();
   });
 

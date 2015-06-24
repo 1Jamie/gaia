@@ -67,7 +67,6 @@ suite('Radio > ', function() {
   });
 
   test('Should ask step ready', function(done) {
-    MockFtuLauncher.mReadyRightAway = true;
     MockLazyLoader.mLoadRightAway = true;
     Service.register('stepReady', MockFtuLauncher);
     Service.request('stepReady', 'test').then(function() {
@@ -77,6 +76,16 @@ suite('Radio > ', function() {
         'js/mobile_connection_icon.js']));
       done();
     });
+  });
+
+
+  test('Should update icon when fallback settings is changed', function() {
+    radio.icon = new MobileConnectionIcon(radio);
+    this.sinon.stub(radio.icon, 'update');
+    MockNavigatorSettings.mTriggerObservers(
+      'ril.radio.disabled', { settingValue: true });
+    assert.isFalse(radio.settingEnabled);
+    assert.isTrue(radio.icon.update.called);
   });
 
   suite('Update icons on multi-SIM device', function() {

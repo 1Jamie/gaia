@@ -24,8 +24,8 @@ requireApp('settings/js/vendor/alameda.js', (function() {
       'shared/screen_layout': {
         exports: 'ScreenLayout'
       },
-      'shared/tagged': {
-        exports: 'Tagged'
+      'shared/sanitizer': {
+        exports: 'Sanitizer'
       },
       'shared/tz_select': {
         exports: 'tzSelect'
@@ -129,6 +129,9 @@ requireApp('settings/js/vendor/alameda.js', (function() {
       },
       'shared_mocks/mock_navigator_moz_icc_manager' : {
         exports: 'MockNavigatorMozIccManager'
+      },
+      'shared_mocks/mock_navigator_moz_power': {
+        exports: 'MockMozPower'
       }
     },
     modules: [

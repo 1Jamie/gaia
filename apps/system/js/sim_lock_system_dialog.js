@@ -1,4 +1,4 @@
-/* global SystemDialog, SIMSlotManager, applications */
+/* global SystemDialog, SIMSlotManager, applications, Service */
 'use strict';
 
 (function(exports) {
@@ -17,6 +17,8 @@
     this.render();
     this._dispatchEvent('created');
   };
+
+  var ORIENTATION = 'portrait-primary';
 
   SimLockSystemDialog.prototype = Object.create(SystemDialog.prototype,
     {
@@ -217,7 +219,7 @@
       }
     }).bind(this);
     request.onerror = function() {
-      console.error('Could not fetch CardLockRetryCount', request.error.name);
+      console.log('Could not fetch CardLockRetryCount', request.error.name);
     };
 
     switch (lockType) {
@@ -434,6 +436,8 @@
     }
 
     SystemDialog.prototype.show.apply(this);
+    var appWindow = Service.query('getTopMostWindow');
+    appWindow.lockOrientation(ORIENTATION);
     this._visible = true;
     this.lockType = 'pin';
     this.handleCardState();
@@ -455,6 +459,8 @@
   SimLockSystemDialog.prototype.hide = function() {
     this._visible = false;
     SystemDialog.prototype.hide.apply(this);
+    var appWindow = Service.query('getTopMostWindow');
+    appWindow.lockOrientation();
   };
 
   SimLockSystemDialog.prototype.close = function() {

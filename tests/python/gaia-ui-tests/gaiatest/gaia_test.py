@@ -46,6 +46,10 @@ DEFAULT_SETTINGS = {
     'vibration.enabled': False,  # disable vibration
 }
 
+DEFAULT_PREFS = {
+    'webapps.update.enabled': False  # disable web apps update
+}
+
 
 class GaiaApp(object):
 
@@ -490,7 +494,7 @@ class GaiaData(object):
             return [file for file in files if file['name'].endswith(extension)]
         return files
 
-    def send_sms(self, number, message):
+    def send_sms(self, number, message, skip_verification=False):
         self.marionette.switch_to_frame()
         import json
         number = json.dumps(number)
@@ -498,7 +502,7 @@ class GaiaData(object):
 
         self.marionette.push_permission('sms', True)
         self.set_bool_pref('dom.sms.enabled', True)
-        result = self.marionette.execute_async_script('return GaiaDataLayer.sendSMS(%s, %s)' % (number, message))
+        result = self.marionette.execute_async_script('return GaiaDataLayer.sendSMS(%s, %s, %s)' % (number, message, str(skip_verification).lower()))
         self.marionette.push_permission('sms', False)
         self.clear_user_pref('dom.sms.enabled')
 
@@ -508,12 +512,12 @@ class GaiaData(object):
         self.marionette.execute_script('new Notification("%s", %s);' % (title, json.dumps(options)))
 
     def clear_notifications(self):
-        self.marionette.execute_script('window.wrappedJSObject.NotificationScreen.clearAll();')
+        self.marionette.execute_script("window.wrappedJSObject.Service.request('NotificationScreen:clearAll');")
 
     @property
     def current_audio_channel(self):
         self.marionette.switch_to_frame()
-        return self.marionette.execute_script("return window.wrappedJSObject.soundManager.currentChannel;")
+        return self.marionette.execute_script("return window.wrappedJSObject.Service.query('currentChannel');")
 
 
 class Accessibility(object):
@@ -668,15 +672,11 @@ class GaiaDevice(object):
         self._set_storage_path()
 
     def wait_for_b2g_ready(self, timeout=120):
-        # Wait for the homescreen to finish loading
-        Wait(self.marionette, timeout).until(expected.element_present(
-            By.CSS_SELECTOR, '#homescreen[loading-state=false]'))
-
         # Wait for logo to be hidden
         self.marionette.set_search_timeout(0)
         try:
             Wait(self.marionette, timeout, ignored_exceptions=StaleElementException).until(
-                lambda m: not m.find_element(By.ID, 'os-logo').is_displayed())
+                lambda m: m.find_element(By.TAG_NAME, 'body').get_attribute('ready-state') == 'fullyLoaded')
         except NoSuchElementException:
             pass
         self.marionette.set_search_timeout(self.marionette.timeout or 10000)
@@ -724,14 +724,14 @@ class GaiaDevice(object):
     def turn_screen_off(self):
         apps = GaiaApps(self.marionette)
         self.marionette.switch_to_frame()
-        ret = self.marionette.execute_script("window.wrappedJSObject.ScreenManager.turnScreenOff(true)")
+        ret = self.marionette.execute_script("window.wrappedJSObject.Service.request('turnScreenOff', true)")
         apps.switch_to_displayed_app()
         return ret
 
     def turn_screen_on(self):
         apps = GaiaApps(self.marionette)
         self.marionette.switch_to_frame()
-        ret = self.marionette.execute_script("window.wrappedJSObject.ScreenManager.turnScreenOn(true)")
+        ret = self.marionette.execute_script("window.wrappedJSObject.Service.request('turnScreenOn', true)")
         apps.switch_to_displayed_app()
         return ret
 
@@ -739,7 +739,7 @@ class GaiaDevice(object):
     def is_screen_enabled(self):
         apps = GaiaApps(self.marionette)
         self.marionette.switch_to_frame()
-        ret = self.marionette.execute_script('return window.wrappedJSObject.ScreenManager.screenEnabled')
+        ret = self.marionette.execute_script('return window.wrappedJSObject.Service.query("screenEnabled")')
         apps.switch_to_displayed_app()
         return ret
 
@@ -780,10 +780,14 @@ class GaiaDevice(object):
     @property
     def is_locked(self):
         self.marionette.switch_to_frame()
-        return self.marionette.execute_script('return window.wrappedJSObject.Service.locked')
+        return self.marionette.execute_script("return window.wrappedJSObject.Service.query('locked')")
 
     def lock(self):
+        self.marionette.switch_to_frame()
         GaiaData(self.marionette).set_setting('lockscreen.enabled', True)
+        # Make sure the screen isn't turned off in lockscreen mode
+        self.marionette.execute_script(
+            'window.wrappedJSObject.ScreenManager.LOCKING_TIMEOUT = 9999;')
         self.turn_screen_off()
         self.turn_screen_on()
         assert self.is_locked, 'The screen is not locked'
@@ -856,7 +860,7 @@ class GaiaTestCase(MarionetteTestCase, B2GTestCaseMixin):
             try:
                 if self.device.is_android_build:
                     self.cleanup_data()
-                self.set_defaults()
+                self.set_default_settings()
             finally:
                 # make sure we restart to avoid leaving us in a bad state
                 self.device.start_b2g()
@@ -944,19 +948,30 @@ class GaiaTestCase(MarionetteTestCase, B2GTestCaseMixin):
 
         self.device.turn_screen_off()
         self.device.turn_screen_on()
-        
+
         # kill the FTU and any open, user-killable apps
         self.apps.kill_all()
+
+        default_prefs = DEFAULT_PREFS.copy()
+        default_prefs.update(self.testvars.get('prefs', {}))
+        default_prefs = self.modify_prefs(default_prefs)
+        for name, value in default_prefs.items():
+            if type(value) is int:
+                self.data_layer.set_int_pref(name, value)
+            elif type(value) is bool:
+                self.data_layer.set_bool_pref(name, value)
+            else:
+                self.data_layer.set_char_pref(name, value)
 
         # unlock
         if self.data_layer.get_setting('lockscreen.enabled'):
             self.device.unlock()
 
         if full_reset:
-            defaults = DEFAULT_SETTINGS.copy()
-            defaults.update(self.testvars.get('settings', {}))
-            defaults = self.modify_settings(defaults)
-            for name, value in defaults.items():
+            default_settings = DEFAULT_SETTINGS.copy()
+            default_settings.update(self.testvars.get('settings', {}))
+            default_settings = self.modify_settings(default_settings)
+            for name, value in default_settings.items():
                 self.data_layer.set_setting(name, value)
 
             # disable carrier data connection
@@ -975,15 +990,6 @@ class GaiaTestCase(MarionetteTestCase, B2GTestCaseMixin):
 
             # reset to home screen
             self.device.touch_home_button()
-
-        # restore prefs from testvars
-        for name, value in self.testvars.get('prefs', {}).items():
-            if type(value) is int:
-                self.data_layer.set_int_pref(name, value)
-            elif type(value) is bool:
-                self.data_layer.set_bool_pref(name, value)
-            else:
-                self.data_layer.set_char_pref(name, value)
 
     def connect_to_local_area_network(self):
         if not self.device.is_online:
@@ -1016,7 +1022,7 @@ class GaiaTestCase(MarionetteTestCase, B2GTestCaseMixin):
         :param settings: dictionary of the settings that would be applied.
         :returns: modified dictionary of the settings to be applied.
 
-        This method provides tha ability for test cases to override the default
+        This method provides the ability for test cases to override the default
         settings before they're applied. To use it, define the method in your
         test class and return a modified dictionary of settings:
 
@@ -1034,7 +1040,31 @@ class GaiaTestCase(MarionetteTestCase, B2GTestCaseMixin):
         """
         return settings
 
-    def set_defaults(self):
+    def modify_prefs(self, prefs):
+        """Hook to modify the default preferences before they're applied.
+
+        :param prefs: dictionary of the preferences that would be applied.
+        :returns: modified dictionary of the preferences to be applied.
+
+        This method provides the ability for test cases to override the default
+        preferences before they're applied. To use it, define the method in your
+        test class and return a modified dictionary of preferences:
+
+        .. code-block:: python
+
+            class TestModifyPrefs(GaiaTestCase):
+
+                def modify_prefs(self, prefs):
+                    prefs['foo'] = 'bar'
+                    return prefs
+
+                def test_modify_prefs(self):
+                    self.assertEqual('bar', self.data_layer.get_char_pref('foo'))
+
+        """
+        return prefs
+
+    def set_default_settings(self):
         filename = 'settings.json'
         defaults = DEFAULT_SETTINGS.copy()
         defaults.update(self.testvars.get('settings', {}))

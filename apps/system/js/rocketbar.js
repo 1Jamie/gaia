@@ -32,7 +32,6 @@
     this.clearBtn = document.getElementById('rocketbar-clear');
     this.results = document.getElementById('rocketbar-results');
     this.backdrop = document.getElementById('rocketbar-backdrop');
-    this.start();
   }
 
   Rocketbar.prototype = {
@@ -75,6 +74,8 @@
       this.addEventListeners();
       this.enabled = true;
       Service.request('registerHierarchy', this);
+      Service.registerState('enabled', this);
+      Service.register('handleInput', this);
     },
 
     /**
@@ -200,6 +201,7 @@
       window.addEventListener('global-search-request', this);
       window.addEventListener('attentionopening', this);
       window.addEventListener('attentionopened', this);
+      window.addEventListener('activityrequesting', this);
       window.addEventListener('searchopened', this);
       window.addEventListener('searchclosed', this);
       window.addEventListener('utilitytray-overlayopening', this);
@@ -277,6 +279,7 @@
         case 'attentionopened':
         case 'appforeground':
         case 'appopened':
+        case 'activityrequesting':
         case 'simlockrequestfocus':
         case 'cardviewbeforeshow':
 
@@ -325,9 +328,7 @@
           }
           break;
         case 'global-search-request':
-          // XXX: fix the WindowManager coupling
-          // but currently the transition sequence is crucial for performance
-          var app = Service.currentApp;
+          var app = Service.query('AppWindowManager.getActiveWindow');
           var afterActivate;
 
           if (app && !app.isActive()) {
@@ -569,7 +570,8 @@
         this._port.postMessage({
           action: 'change',
           input: input,
-          isPrivateBrowser: Service.currentApp.isPrivateBrowser()
+          isPrivateBrowser:
+            Service.query('AppWindowManager.getActiveWindow').isPrivateBrowser()
         });
       }
     },
@@ -604,7 +606,8 @@
       });
 
       // Do not persist search submissions from private windows.
-      if (Service.currentApp.isPrivateBrowser()) {
+      if (Service.query('AppWindowManager.getActiveWindow')
+                 .isPrivateBrowser()) {
         this.setInput('');
       }
     },

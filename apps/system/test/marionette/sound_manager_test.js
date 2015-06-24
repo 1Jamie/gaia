@@ -16,12 +16,16 @@ marionette('Sound manager tests', function() {
   var client = marionette.client({
     profile: {
       apps: apps
-    }
+    },
+    desiredCapabilities: { raisesAccessibilityExceptions: true }
   });
 
   var soundToast;
+  var system;
 
   setup(function() {
+    system = client.loader.getAppClass('system');
+    system.waitForFullyLoaded();
     soundToast = new SoundToast(client);
   });
 

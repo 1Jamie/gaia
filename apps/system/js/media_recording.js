@@ -1,4 +1,4 @@
-/* global applications, ManifestHelper, RecordingIcon, LazyLoader */
+/* global applications, ManifestHelper, RecordingIcon, LazyLoader, Service */
 (function(exports) {
   'use strict';
 
@@ -12,6 +12,8 @@
   }
 
   MediaRecording.prototype = {
+    name: 'MediaRecording',
+
     /**
      * To tell if the current state is using any recording device, like mic or
      * camera. Used to control the present of statusbar status.
@@ -39,6 +41,7 @@
       }.bind(this)).catch(function(err) {
         console.error(err);
       });
+      Service.registerState('isRecording', this);
     },
 
     /**
@@ -54,6 +57,7 @@
       this.container = null;
 
       window.removeEventListener('mozChromeEvent', this);
+      Service.unregisterState('isRecording', this);
     },
 
     /**
@@ -155,7 +159,7 @@
           messageElement, timerElement;
       /* create panel
        <div class="media-recording-status fake-notification" role="listitem">
-         <div data-icon="video"></div>
+         <div data-icon="video" aria-hidden="true"></div>
          <div class="title-container">
            <div class="origin"></div>
            <div class="timestamp"></div>
@@ -169,6 +173,7 @@
 
       iconElement = document.createElement('div');
       iconElement.dataset.icon = item.icon;
+      iconElement.setAttribute('aria-hidden', true);
       iconElement.className = 'alert';
       panelElement.appendChild(iconElement);
 

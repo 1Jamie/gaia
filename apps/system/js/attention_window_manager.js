@@ -1,4 +1,5 @@
-/* globals Service, homescreenLauncher, SettingsListener */
+/* globals Service, BaseModule,
+           DialerAgent */
 'use strict';
 
 (function(exports) {
@@ -57,8 +58,8 @@
         return true;
       }
       this._topMostWindow = null;
-      var nextApp = homescreenLauncher.getHomescreen();
-      if (Service.locked) {
+      var nextApp = Service.query('getHomescreen');
+      if (Service.query('locked')) {
         this.closeAllAttentionWindows();
       } else if (nextApp && !nextApp.isDead()) {
         nextApp.ready(this.closeAllAttentionWindows.bind(this));
@@ -118,6 +119,14 @@
       window.addEventListener('rocketbar-overlayopened', this);
       window.addEventListener('languagechange', this);
       Service.request('registerHierarchy', this);
+      if (navigator.mozTelephony) {
+        BaseModule.lazyLoad(['DialerAgent']).then(function() {
+          // DialerAgent will create callscreen window
+          // so it is 'CallscreenWindowLauncher' exactly.
+          var dialerAgent = new DialerAgent();
+          dialerAgent.start();
+        });
+      }
     },
 
     stop: function attwm_stop() {
@@ -160,13 +169,6 @@
           break;
 
         case 'attentionrequestclose':
-          //
-          // This resets the state of this settings flag.
-          // See the corresponding code in the requestopen handler.
-          //
-          window.SettingsListener && SettingsListener.getSettingsLock().set({
-            'private.broadcast.attention_screen_opening': false
-          });
           this._openedInstances.delete(attention);
           if (this._topMostWindow !== attention) {
             attention.close();
@@ -176,7 +178,7 @@
           var candidate = null;
           if (this._openedInstances.size === 0) {
             this._topMostWindow = null;
-            candidate = Service.currentApp;
+            candidate = Service.query('AppWindowManager.getActiveWindow');
           } else {
             this._openedInstances.forEach(function(instance) {
               candidate = instance;
@@ -208,17 +210,6 @@
           break;
 
         case 'attentionrequestopen':
-          //
-          // The camera app needs to be notified before an attention window
-          // appears so that it can stop recording video before ringer or
-          // alarm sounds are recorded. We abuse the settings API as
-          // a simple way to broadcast this message.
-          // See bugs 995540 and 1006200
-          // XXX: We should remove this hack if bug 1034001 is landed.
-          //
-          window.SettingsListener && SettingsListener.getSettingsLock().set({
-            'private.broadcast.attention_screen_opening': true
-          });
           this._topMostWindow = attention;
           attention.ready(function() {
             if (document.mozFullScreen) {
